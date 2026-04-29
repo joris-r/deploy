@@ -1,0 +1,24 @@
+services:
+  alice:
+    image: alpine
+    container_name: alice
+    command: sleep infinity
+    networks:
+      - playground
+
+  bob:
+    image: alpine
+    container_name: bob
+    command: sleep infinity
+    networks:
+      - playground
+  charlie:
+    image: alpine
+    container_name: charlie
+    command: sleep infinity
+    networks:
+      - isolated
+
+networks:
+  playground:
+  isolated:
