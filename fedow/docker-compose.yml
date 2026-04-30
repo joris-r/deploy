@@ -1,0 +1,12 @@
+services:
+  fedow_memcached:
+    image: memcached:1.6
+
+  fedow_django:
+    build: 
+      context: ..
+      dockerfile: fedow/Dockerfile    # car le context de ce Dockerfile doit être la racine du dépot
+    ports:
+      - "8000:8000"
+    env_file: .env                    # relatif à ce fichier
+    command: ["bash", "start.sh"]

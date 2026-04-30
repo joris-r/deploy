@@ -82,6 +82,18 @@ Attention, tout le context est envoyé au deamon docker. Cela peut le ralentir.
 On peut écrire un `.dockerignore` qui doit être dans le contexte
 afin d'exclure les fichiers qui ne sont nécessaire au build.
 
+
+Pour la conception d'une image, il faut bien comprendre qu'il y a une frontière
+entre la construction de l'image (il faut collecter en une fois toutes les ressources
+nécessaire au fonctionement du service) et la configuration / les scripts du 
+containter qui doivent être capable de gérer le cycle de vie. La configuration
+du service se fait par des variables d'environnement qui doivent être injectée
+avant les exécutions du conteneurs.
+De ces variables le service dans l'image va pouvoir se configurer. Il y aura
+également des migrations, c'est à dire qu'on va changer la version de l'image
+et il faudra mettre à jour si nécessaire le contenu des volumes persistants
+(nommés) qui contiennent typiquement la base de donnée.
+
 ---------------------------------------------------------
 
 
@@ -94,11 +106,11 @@ Notes :
   - Fedow git@github.com:joris-r/Fedow.git
   - Lespass git@github.com:joris-r/Lespass.git
 
-~~~
+```
 mkdir repo
 cd repo/
 git clone https://github.com/TiBillet/Fedow.git
-~~~
+```
 
 
 J'ai écrit un Dockerfile et un start_prod.sh, les deux
@@ -106,14 +118,14 @@ orienté prod avec un peu de nettoyage mais j'ai gardé
 l'essentiel identique.
 Le Dockerfile suppose que le context de build est ce dépot !
 
-~~~
+```
 docker build -t fedow_django -f fedow/Dockerfile .
-~~~
+```
 
 Et on peut faire des check avec
-~~~
+```
 docker run --rm fedow_django poetry run python manage.py check
-~~~
+```
 
 Il y a des erreurs.
 
@@ -124,7 +136,7 @@ J'écrit un `fedow/.env.example` pour documentation.
 
 Puis d'en déduit un `.env.test`
 
-~~~
+``` sh
 cat > fedow/.env.test << 'EOF'
 SECRET_KEY=aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkk123456
 FERNET_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -133,15 +145,88 @@ STRIPE_TEST=1
 STRIPE_KEY_TEST=sk_test_fake
 TEST=1
 EOF
-~~~
+```
 
 La commande de test devient
 
-~~~
+``` sh
 docker run --rm --env-file fedow/.env.test fedow_django \
   poetry run python manage.py check
-~~~
+```
 
 Résultat OK : `System check identified no issues (0 silenced).`
 
 
+
+## 2026-04-30 Phase 2
+
+Docker compose est une commande de docker qui orchestre le deployement
+de containeurs en vue de fournir un service (souvent une application web).
+
+Structure (en yaml)
+
+``` yaml
+services:
+  nom_du_service:
+    image: nginx:1.25        # image existante depuis le Hub
+    # OU
+    build: .                 # construire depuis un Dockerfile local
+
+networks:
+  mon_reseau:
+
+volumes:
+  ma_donnee:
+```
+
+Pour configurer un service:
+
+- `image` image existante local ou hub global
+- ou alors `build <context>` on va utiliser un Dockerfile dans ce context
+- forme longue de `build:`
+  - `context: <dir>`
+  - `dockerfile: <dockerfile>`
+- `ports <host>:<container>` ouvrir le port `<host>` qui est branché sur `<container>`.
+- `env_file` le fichier des variables d'environnement
+- sinon directement dans `environment` (plutot celle pas secretes)
+- `depends_on <service>` attend que `<service>` soit démarré
+- `command <C>` pour remplacer le `CMD` du Dockerfile
+  - en pratique `command: ["bash", "start.sh"]` offre le plus de controle
+    et c'est `bash` qui recoit le SIGTERM de fermeture du container
+    donc il faut mettre `exec` devant la dernière commande du script `start.sh`
+  - sinon la forme string donne un environement shell (donc redirection et autre)
+- `volumes <A>:<cdir>`, `<cdir>` est dans le container, `<A>` peut être
+  -  `<nom>` un volume nommé pour les données persistantes
+  -  `<hdir>` un répertoire sur le host pour un *bind mount* (transparent)
+- `networks` liste des réseaux connecté
+  - PAR DEFAUT : un network commun à tous les services est mis en place
+
+Pour lancer `docker compose -f <file> up`
+  (ouvre `./docker-compose.yml` par défaut)
+
+Autres commandes
+
+- `docker compose up` — crée et démarre les conteneurs
+- `docker compose down` — arrête et supprime les conteneurs (les volumes nommés sont conservés)
+- `docker compose down -v` — idem mais supprime aussi les volumes nommés
+- `docker compose stop` — arrête sans supprimer les conteneurs
+- `docker compose start` — redémarre des conteneurs arrêtés
+- `docker compose restart` — stop + start
+- `docker compose logs -f` — suit les logs
+- `docker compose ps` — état des services
+- `docker compose exec <service> bash` — shell dans un conteneur
+- `docker compose build` — construit les images sans démarrer
+
+--------------------------------
+
+
+J'ai écrit un docker-compose.yml et un .env (le même que phase précédente)
+Il est un peu compliqué car on ne travail pas dans le dépot
+ni dans le répertoire courant.
+
+Lancé avec `docker compose -f fedow/docker-compose.yml up -d`
+
+Vérifier avec `http://localhost:8000/dashboard/` (ou `curl` mais
+ici c'est une page web)
+
+On ferme avec `docker compose -f fedow/docker-compose.yml down`

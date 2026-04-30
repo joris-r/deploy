@@ -33,6 +33,31 @@ des paquets sans être nettoyé.
 **Action :** supprimer `git` des paquets installés pour alléger
 l'image.
 
+## Fedow — `exec` manquant devant Gunicorn
+
+Le `start.sh` du repo Fedow lance Gunicorn sans `exec` :
+
+```bash
+poetry run gunicorn ...
+```
+
+Sans `exec`, bash reste PID 1 et Gunicorn tourne comme processus
+enfant. Quand Docker envoie `SIGTERM` pour arrêter le conteneur,
+bash l'ignore et Gunicorn ne le reçoit jamais. Docker attend le
+timeout puis envoie `SIGKILL` — arrêt brutal sans graceful shutdown.
+
+**Correction :**
+
+```bash
+exec poetry run gunicorn ...
+```
+
+`exec` remplace bash par Gunicorn qui devient PID 1 et reçoit
+directement les signaux.
+
+**Action :** ajouter `exec` devant la commande Gunicorn dans
+`start.sh`.
+
 ## Fedow — logs Gunicorn dans un fichier
 
 Le `start.sh` du repo Fedow passe `--log-file` à Gunicorn, ce qui
