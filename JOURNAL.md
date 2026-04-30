@@ -119,3 +119,29 @@ Il y a des erreurs.
 
 Django charge settings.py qui plante immédiatement sur SECRET_KEY absente.
 Il faut passer les variables d'environnement minimales — au moins SECRET_KEY, FERNET_KEY et DOMAIN.
+
+J'écrit un `fedow/.env.example` pour documentation.
+
+Puis d'en déduit un `.env.test`
+
+~~~
+cat > fedow/.env.test << 'EOF'
+SECRET_KEY=aaaabbbbccccddddeeeeffffgggghhhhiiiijjjjkkkk123456
+FERNET_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+DOMAIN=localhost
+STRIPE_TEST=1
+STRIPE_KEY_TEST=sk_test_fake
+TEST=1
+EOF
+~~~
+
+La commande de test devient
+
+~~~
+docker run --rm --env-file fedow/.env.test fedow_django \
+  poetry run python manage.py check
+~~~
+
+Résultat OK : `System check identified no issues (0 silenced).`
+
+

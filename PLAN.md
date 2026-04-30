@@ -26,7 +26,7 @@ Before writing anything:
 
 ------------------------------------------------------------------------
 
-### Phase 1 --- Fedow Dockerfile
+### Phase 1 --- Fedow Dockerfile [TERMINÉE]
 
 **Why start here:** Fedow is simpler (SQLite, no Celery, no Postgres).
 Getting it right first gives you a working dependency before touching
