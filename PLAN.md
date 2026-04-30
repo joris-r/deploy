@@ -38,8 +38,8 @@ Lespass.
     `/home/joris/DEV/tibillet/Fedow/`
 2.  Add a `.dockerignore` (exclude `database/`, `logs/`, `.env`,
     `__pycache__`, `*.pyc`)
-3.  `docker build -t fedow-test .`
-4.  `docker run --rm fedow-test python manage.py check` --- should pass
+3.  `docker build -t fedow_django .`
+4.  `docker run --rm fedow_django poetry run python manage.py check` --- should pass
     with no errors
 
 **Verify:** the image builds and Django loads without crashing.
