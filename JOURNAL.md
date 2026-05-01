@@ -25,6 +25,10 @@ Un container, c'est une image en train de s'exécuter pour cela
 il y a une couche de fichier mutable en plus.
 Un container est principalement définit par cette couche mutable.
 
+En plus des tuyaux (réseau), on peut aussi avoir des volumes qui
+peuvent partager des répertoire de fichier entre les boites
+mais aussi sur le système hotes.
+
 Le docker compose orchestre la création et le lancement des containers,
 les réseau, les volumes.
 Il définit des services nommés (donne un DNS automatique).
@@ -179,27 +183,122 @@ volumes:
   ma_donnee:
 ```
 
-Pour configurer un service:
+Il y a plusieurs sections de premier niveau possible :
 
-- `image` image existante local ou hub global
-- ou alors `build <context>` on va utiliser un Dockerfile dans ce context
-- forme longue de `build:`
-  - `context: <dir>`
-  - `dockerfile: <dockerfile>`
-- `ports <host>:<container>` ouvrir le port `<host>` qui est branché sur `<container>`.
-- `env_file` le fichier des variables d'environnement
-- sinon directement dans `environment` (plutot celle pas secretes)
-- `depends_on <service>` attend que `<service>` soit démarré
-- `command <C>` pour remplacer le `CMD` du Dockerfile
+- `services`
+- `networks`
+- `volumes`
+
+Attention, des mots clés sont réutilisés à des niveau différents
+avec des sémantiques différentes.
+
+**Services**
+
+**Pour** la section `services:`, on fait une sous section avec un nom de service.
+Et ensuite il y a plusieurs sous sections possibles :
+
+- `image:` ou `build`
+- `networks:` (ne pas confondre avec le networks de premier niveau)
+- `command:`
+- `volumes:` (ne pas confondre avec le volumes de premier niveau)
+
+**Pour** `services: > <nom-service> > image: <nom>`
+cela permet de récupérer une image `<nom>` sur le hub global
+(on peut aussi récupérer une image local)
+
+**Pour** `services: > <nom-service> > build: <context>` (forme courte)
+configure un répertoire `<context>` qui sert de racine pour le build
+
+
+**Pour** `services: > <nom-service> > build: <context>` (forme longue)
+elle permet de spécifier aussi un nom de dockerfile
+
+Enfants :
+
+- `context: <dir>`
+- `dockerfile: <dockerfile>`
+
+
+Pour `services: > <nom-service> > networks:` liste des **réseaux**
+
+Enfants :
+
+- `<nom-network>` Connecte `<nom-service>` sur `<nom-network>`
+
+Remarques :
+
+- PAR DEFAUT : un network commun à tous les services est mis en place
+- les noms de services, devienent des hostname automatiquement
+- les services (donc les conteneurs) peuvent utiliser que les network attaché
+- sur les networks tous les ports sont ouverts entre le conteneur attaché au network
+- (la directive `EXPOSE` du Dockerfile n'est que de la documentation)
+
+
+**Pour** `services: > <nom-service> > ports:` liste des **ports ouverts**
+
+gestion des ports hôtes: par défaut pas de port ouverts depuis l'hote
+
+Enfants :
+
+- `<ph>:<pc>` ouvre un port `<ph>` est mappé sur l'hote vers le port `<pc>` du service/conteneur
+
+
+**Pour** `services: > <nom-service> > env_file: <fichier>` spécifie le fichier
+contenant les variables  d'environnement
+
+
+**Pour** `services: > <nom-service> > environment:` spécifie directement des
+variables d'environnement. Plutot pour celle pas secretes
+
+Enfants :
+
+- déclaration de variables
+
+
+**Pour** `services: > <nom-service> > depends_on: <service>`
+attend que `<service>` soit démarré
+
+**Pour** `services: > <nom-service> > command: <C>`
+pour remplacer le `CMD` du Dockerfile par `<C>`
+
+Deux forme :
   - en pratique `command: ["bash", "start.sh"]` offre le plus de controle
     et c'est `bash` qui recoit le SIGTERM de fermeture du container
     donc il faut mettre `exec` devant la dernière commande du script `start.sh`
   - sinon la forme string donne un environement shell (donc redirection et autre)
-- `volumes <A>:<cdir>`, `<cdir>` est dans le container, `<A>` peut être
-  -  `<nom>` un volume nommé pour les données persistantes
-  -  `<hdir>` un répertoire sur le host pour un *bind mount* (transparent)
-- `networks` liste des réseaux connecté
-  - PAR DEFAUT : un network commun à tous les services est mis en place
+
+**Pour** `services: > <nom-service> > volumes:`
+
+Enfants :
+
+- `<nom>:cdir` un volume nommé pour les données persistantes
+- `<hdir>:cdir` un répertoire sur le host pour un *bind mount* (transparent)
+
+
+
+**Networks** - Réseau personalisé
+
+Permet d'avoir plusieurs réseaux, et donc d'isoler les services entre eux.
+Il faut ensuite utiliser les réseaux créé dans la section réseau des services.
+
+Enfants :
+
+- `<nom-réseau>` déclare un réseau
+
+
+
+**Volumes** - Déclaration de volume nommé
+
+Permet de déclarer des volumes, qui seront utilisé par les services.
+
+
+Enfants :
+
+- `<nom-volume>` déclare un volume
+
+
+
+**Les commandes CLI**
 
 Pour lancer `docker compose -f <file> up`
   (ouvre `./docker-compose.yml` par défaut)
@@ -217,6 +316,16 @@ Autres commandes
 - `docker compose exec <service> bash` — shell dans un conteneur
 - `docker compose build` — construit les images sans démarrer
 
+Exemple plus évolué
+
+Ici on a fait `docker compose -f fedow/docker-compose.yml up --build -d`
+
+- `--build` reconstruction de toutes les images (mais y'a des layers en cache) 
+- compose up recrée les conteneurs dont la configuration ou l'image a changé
+  (on aurait pu aussi lancer des docker build à la main avant)
+
+
+
 --------------------------------
 
 
@@ -230,3 +339,54 @@ Vérifier avec `http://localhost:8000/dashboard/` (ou `curl` mais
 ici c'est une page web)
 
 On ferme avec `docker compose -f fedow/docker-compose.yml down`
+
+
+## 2026-05-01 Phase 3
+
+(complété les notes d'hier sur docker compose)
+
+On a ajouté un volumes global et un service nginx.
+Le volume est partagé par django_fedow eet django_nginx
+ce qui permet à nginx d'accèder aux fichiers statiques
+produit par django dans son container.
+
+~~~ bash
+docker compose -f fedow/docker-compose.yml up -d
+docker compose -f fedow/docker-compose.yml ps
+# Il manque fedow_nginx
+docker compose -f fedow/docker-compose.yml logs fedow_nginx
+# erreur car la conf nginx utilise des fichiers de log
+# et ces fichier n'existe pas dans mon image
+~~~
+
+La conf utilise des fichiers normaux. La bonne pratique est
+que les conteneurs écrivent leurs logs sur stdout/stderr — c'est Docker lui-même
+qui gère la collecte et la rotation via son système de logging.
+
+Je lis https://hub.docker.com/_/nginx et dans le Dockerfile officiel
+Il y a
+
+``` sh
+# forward request and error logs to docker log collector
+&& ln -sf /dev/stdout /var/log/nginx/access.log \
+&& ln -sf /dev/stderr /var/log/nginx/error.log \
+```
+
+J'ai modifié la conf fedow/nginx/django.conf pour remettre
+les chemins par défaut.
+
+relancer le compose up. Nginx tourne, il répond sur `curl http://localhost/`
+
+
+Il y avait une erreur : il faut lancer le script `fedow/start_prod.sh`
+
+``` sh
+docker compose -f fedow/docker-compose.yml up --build -d
+```
+
+Avec `curl http://localhost/static/` On a une erreur 403 Forbidden.
+Mais c'est normal puisque le listing des dossiers est interdit.
+
+Cherchons un truc `docker exec fedow-fedow_django-1 ls /home/fedow/Fedow/www/static/`
+On le récupère avec `curl -v http://localhost/static/css/main.css`
+En fait il est vide mais peut importe (on peut le voir en ajoutant `-v`)

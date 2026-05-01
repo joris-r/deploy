@@ -6,7 +6,19 @@ services:
     build: 
       context: ..
       dockerfile: fedow/Dockerfile    # car le context de ce Dockerfile doit être la racine du dépot
-    ports:
-      - "8000:8000"
     env_file: .env                    # relatif à ce fichier
-    command: ["bash", "start.sh"]
+    command: ["bash", "start_prod.sh"]
+    volumes:
+      - fedow_static:/home/fedow/Fedow/www
+
+  fedow_nginx:
+    image: nginx:1.30
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d    # volume BIND 
+      - fedow_static:/www
+volumes:
+  fedow_static:
+
+

@@ -10,8 +10,8 @@ Le `dockerfile` du repo Fedow utilise :
 - **Python 3.10** — en "security only", plus de bugfixes depuis 2023.
   Versions recommandées : 3.12 ou 3.13.
 - **Bullseye** (Debian 11) — EOL août 2024. Remplacer par
-  **Bookworm** (Debian 12), supporté jusqu'en 2028 en LTS mais EOL en juin 2026
-  sinon **Trixie** (Debian 13), EOL en 2028.
+  **Trixie** (Debian 13) — les images officielles `memcached` et
+  `nginx` sont déjà sur Trixie, autant aligner Fedow pour cohérence.
 
 Le dockerfile est bien celui utilisé en prod : le `docker-compose.yml`
 fait `build: .` (l'option `image: tibillet/fedow:latest` est
@@ -19,7 +19,7 @@ commentée). La dernière ligne du compose confirme que c'est ce
 dockerfile qui sert à construire et publier l'image sur Docker Hub.
 
 **Action :** signaler à l'équipe et proposer une montée de version
-(`python:3.12-bookworm`), en vérifiant d'abord la compatibilité des
+(`python:3.12-trixie`), en vérifiant d'abord la compatibilité des
 dépendances dans `pyproject.toml`.
 
 ## Fedow — `git` installé mais inutile
@@ -58,14 +58,28 @@ directement les signaux.
 **Action :** ajouter `exec` devant la commande Gunicorn dans
 `start.sh`.
 
-## Fedow — logs Gunicorn dans un fichier
+## Fedow — image Nginx sans version dans le compose
 
-Le `start.sh` du repo Fedow passe `--log-file` à Gunicorn, ce qui
-écrit les logs dans un fichier à l'intérieur du container. En Docker,
-la convention est de logger sur stdout/stderr pour que `docker logs`
-fonctionne. Un fichier de log non géré grossit indéfiniment et
-nécessite un `logrotate` manuel.
+Le `docker-compose.yml` du repo Fedow utilise `image: nginx` sans
+numéro de version, ce qui équivaut à `latest`. Un `docker compose
+pull` peut silencieusement mettre à jour Nginx vers une version
+non testée et casser la configuration.
 
-**Action :** supprimer `--log-file` de la commande Gunicorn. Les logs
-stdout sont gérés automatiquement par Docker avec rotation configurable
-(`max-size`, `max-file`).
+**Action :** épingler une version explicite, ex. `image: nginx:1.30`.
+
+## Fedow — logs dans des fichiers (Gunicorn et Nginx)
+
+Le `start.sh` passe `--log-file` à Gunicorn, et la config Nginx
+écrit `access_log` et `error_log` dans `/logs/`. En Docker, la
+convention est de logger sur stdout/stderr pour que `docker logs`
+fonctionne. Des fichiers de log non gérés grossissent indéfiniment
+et nécessitent un `logrotate` manuel.
+
+**Action :**
+- Supprimer `--log-file` de la commande Gunicorn dans `start.sh`
+- Remplacer les directives `access_log` et `error_log` dans la
+  config Nginx par `access_log /dev/stdout;` et
+  `error_log /dev/stderr;`
+
+Les logs stdout sont gérés automatiquement par Docker avec rotation
+configurable (`max-size`, `max-file`).

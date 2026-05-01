@@ -46,7 +46,7 @@ Lespass.
 
 ------------------------------------------------------------------------
 
-### Phase 2 --- Fedow minimal compose (no Nginx, no Traefik)
+### Phase 2 --- Fedow minimal compose (no Nginx, no Traefik) [TERMINÉE]
 
 **Goal:** get Fedow's Django app to respond on a port, directly, with no
 proxy in front.
@@ -78,18 +78,28 @@ services:
 
 ------------------------------------------------------------------------
 
-### Phase 3 --- Add Nginx in front of Fedow
+### Phase 3 --- Add Nginx in front of Fedow [TERMINÉE]
 
 **Goal:** Nginx proxies to Fedow Django. Static files are served by
 Nginx, not Gunicorn.
 
-**Steps:**
+**État actuel (2026-04-30) :**
 
-1.  Remove the direct port exposure from `fedow_django`
-2.  Add `fedow_nginx` with the nginx config and `./www` volume
-3.  Expose port `80` on `fedow_nginx`
-4.  `docker compose up`
-5.  `curl http://localhost/` --- same response, now through Nginx
+- `fedow/nginx/django.conf` créé (copié depuis le repo Fedow)
+- `fedow_nginx` ajouté dans le compose avec le volume bind mount
+  `./nginx:/etc/nginx/conf.d`
+- `fedow_django` expose encore le port 8000 directement
+
+**Ce qui reste à faire :**
+
+1.  Retirer `ports: 8000:8000` de `fedow_django`
+2.  Ajouter un volume nommé `fedow_static` partagé entre
+    `fedow_django` (`/home/fedow/Fedow/www`) et `fedow_nginx`
+    (`/www`) — nécessaire pour que Nginx serve les fichiers
+    générés par `collectstatic`
+3.  Déclarer `fedow_static` dans la section `volumes:` du compose
+4.  `docker compose up --build`
+5.  `curl http://localhost/` --- même réponse, maintenant via Nginx
 
 **Verify:** `curl http://localhost/static/` returns a static file.
 
