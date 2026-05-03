@@ -1,0 +1,19 @@
+services:
+  lespass_postgres:
+    image: postgres:13-bookworm
+    env_file: .env
+
+  lespass_django:
+    build:              # car le context de ce Dockerfile doit être la racine du dépot
+      context: ..
+      dockerfile: lespass/Dockerfile
+    depends_on:
+      - lespass_postgres
+    env_file: .env
+    environment:
+      - POSTGRES_HOST=lespass_postgres
+    ports:
+      - "8002:8002"
+    command: ["bash", "start_prod.sh"]
+
+

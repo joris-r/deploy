@@ -468,5 +468,25 @@ en essayant le check de Django
 ``` sh
 docker run --rm -e DOMAIN=test.local -e SUB=test -e META=test -e DJANGO_SECRET=changeme-50-chars-xxxxxxx
 xxxxxxxxxxxxxxxxxxxxxxxxx lespass-test poetry run python manage.py check
-
 ```
+
+
+**Phase 5** Début docker-compose Lespass
+
+J'écrit un `docker-compose.yml` pour lespass avec son postgres.
+On utilise `depends_on` pour exprimer la dépendance obligatoire.
+
+Pour le lancer `docker compose -f lespass/docker-compose.yml up`
+
+Gestion du `POSTGRES_HOST` dans le compose plutot que dans fichier `.env`
+car le hostname de postgres est défini par le compose.
+Les variables dans `environment:` écrasent celle du fichier.
+
+
+État des container `docker compose -f lespass/docker-compose.yml ps`
+
+test avec `curl -v http://localhost:8002/`
+
+
+**Phase 6**
+

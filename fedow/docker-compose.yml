@@ -3,9 +3,9 @@ services:
     image: memcached:1.6
 
   fedow_django:
-    build: 
+    build:                          # car le context de ce Dockerfile doit être la racine du dépot
       context: ..
-      dockerfile: fedow/Dockerfile    # car le context de ce Dockerfile doit être la racine du dépot
+      dockerfile: fedow/Dockerfile    
     env_file: .env                    # relatif à ce fichier
     command: ["bash", "start_prod.sh"]
     volumes:
