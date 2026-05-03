@@ -211,70 +211,66 @@ Options:
 
 ------------------------------------------------------------------------
 
-### Phase 9 --- Prepare the Coolify deploy
+### Phase 9 --- Compose unique pour Coolify
 
-**Goal:** produce a compose file ready to hand to Coolify. No Traefik
-needed --- Coolify's built-in Traefik handles routing and TLS through
-its UI.
+**Goal:** produire un `docker-compose.yml` unique à la racine de
+`deploy/` rassemblant Fedow et Lespass, prêt pour Coolify.
+
+Fedow et Lespass sont couplés (même `FERNET_KEY`, `FEDOW_DOMAIN`
+nécessaire) — un seul compose est plus cohérent.
+
+**Ce qu'on garde des composes de dev :**
+
+- `build: context/dockerfile` explicites (nos propres images)
+- `start_prod.sh` comme commande de démarrage
+- Bind mount `./lespass/www` pour les statiques Lespass (problème
+  de permissions avec les volumes nommés)
+- Réseau interne unique — plus besoin du réseau externe
+  `tibillet_backend` puisque tout est dans le même compose
 
 **Steps:**
 
-1.  Replace `build: .` with `image: tibillet/fedow:latest` and
-    `image: tibillet/lespass:latest`
-2.  Remove all `./:/DjangoFiles` bind mounts (code is baked into the
-    image)
-3.  Change `start_dev.sh` to `start.sh` in all commands
-4.  Remove all Traefik labels from the compose files --- Coolify
-    ignores them anyway and generates its own
-5.  Remove direct `ports:` exposures --- Coolify routes traffic
-    internally
-6.  Set all runtime flags to production values in `.env` (`DEBUG=0`,
-    `TEST=0`, `DEMO=0`, `STRIPE_TEST=0`, `MIGRATE=0`)
-7.  Use named volumes for all persistent data (database, media files)
+1.  Créer `deploy/docker-compose.yml` avec tous les services :
+    `fedow_memcached`, `fedow_django`, `fedow_nginx`,
+    `lespass_postgres`, `lespass_redis`, `lespass_memcached`,
+    `lespass_django`, `lespass_celery`, `lespass_nginx`
+2.  Volume nommé pour `lespass_postgres` (données persistantes)
+3.  Supprimer le volume `fedow_static` inutile (Fedow ne fait pas
+    de `collectstatic`)
+4.  Retirer les `ports:` de `fedow_nginx` et `lespass_nginx` —
+    Coolify route le trafic en interne
+5.  Créer `deploy/.env` à partir des deux `.env` existants
+6.  `docker compose up` et vérifier que tout démarre
 
-**Verify:** the compose file is clean, no dev artefacts, no Traefik
-labels, no bind mounts.
+**Verify:** `docker compose ps` montre tous les services `Up`.
 
 ------------------------------------------------------------------------
 
 ### Phase 10 --- Deploy on Coolify
 
-**Goal:** Fedow and Lespass running on the production server, reachable
-over HTTPS, with TLS managed by Coolify.
+**Goal:** Fedow et Lespass en production sur le serveur Coolify,
+accessibles en HTTPS, TLS géré par Coolify.
+
+**Contexte :** Coolify utilise son propre Traefik. Il gère le
+routage par domaine, les certificats Let's Encrypt, et les réseaux
+internes. Pas besoin de labels Traefik dans le compose.
 
 **Steps:**
 
-1.  Deploy Fedow first via Coolify UI --- set the domain
-    (`fedow.yourdomain.com`) and paste the Fedow env vars
-2.  Confirm Fedow responds at `https://fedow.yourdomain.com/dashboard/`
-3.  Set `FEDOW_DOMAIN=fedow.yourdomain.com` in the Lespass env
-4.  Deploy Lespass via Coolify UI --- set `MIGRATE=1` for the first
-    deploy only
-5.  Confirm Lespass responds and Celery worker is alive
-6.  Set `MIGRATE=0` in Lespass env and redeploy
+1.  Pousser le repo `deploy` sur GitHub (fork personnel)
+2.  Dans Coolify, créer une nouvelle application de type
+    "Docker Compose" pointant sur ce repo
+3.  Configurer les variables d'environnement dans l'UI Coolify
+    (voir checklist ci-dessous)
+4.  Configurer les domaines dans l'UI Coolify :
+    - `fedow.yourdomain.com` → `fedow_nginx`
+    - `yourdomain.com` et `*.yourdomain.com` → `lespass_nginx`
+5.  Premier déploiement — vérifier les logs de migration
+6.  Vérifier que Fedow répond sur
+    `https://fedow.yourdomain.com/dashboard/`
+7.  Vérifier que Lespass répond sur `https://yourdomain.com/`
 
-**Verify:** `https://yourdomain.com/` and
-`https://fedow.yourdomain.com/dashboard/` both work over HTTPS.
-
-------------------------------------------------------------------------
-
-### Cleanup --- Supprimer le volume `fedow_static` inutile
-
-Le volume nommé `fedow_static` a été ajouté dans le compose Fedow
-par anticipation, mais Fedow ne fait pas de `collectstatic` — il
-n'écrit jamais dans ce volume. Nginx sert un dossier `/www` vide.
-
-**Steps:**
-
-1.  Retirer `fedow_static` du service `fedow_django` (section
-    `volumes:`)
-2.  Retirer `fedow_static` du service `fedow_nginx` (section
-    `volumes:`)
-3.  Retirer `fedow_static` de la section `volumes:` globale
-4.  `docker compose -f fedow/docker-compose.yml up`
-
-**Verify:** Fedow fonctionne toujours, `curl http://localhost/`
-répond.
+**Verify:** les deux services répondent en HTTPS.
 
 ------------------------------------------------------------------------
 
@@ -299,27 +295,15 @@ With Option A, Coolify handles everything:
 - TLS certificate provisioning and renewal via Let's Encrypt
 - Internal networking between containers
 
-All Traefik labels in the original TiBillet compose files can be
-removed --- Coolify generates its own routing configuration through its
-UI.
-
-### Deploy order
-
-1.  Deploy Fedow first (it has no dependencies on Lespass)
-2.  Note the Fedow URL (`fedow.yourdomain.com`)
-3.  Set `FEDOW_DOMAIN=fedow.yourdomain.com` in Lespass env
-4.  Deploy Lespass
-
 ### Production `.env` checklist
 
 - [ ] `DEBUG=0`, `TEST=0`, `DEMO=0`
 - [ ] `STRIPE_TEST=0`
-- [ ] `MIGRATE=0` (set to `1` only for deploys with model changes, then
-  reset)
-- [ ] Fresh `DJANGO_SECRET`, `SECRET_KEY` --- never reuse dev values
-- [ ] Same `FERNET_KEY` in both Fedow and Lespass `.env`
-- [ ] Strong `POSTGRES_PASSWORD`
-- [ ] Real `DOMAIN`, `FEDOW_DOMAIN`, `SUB`, `META`
-- [ ] Valid SMTP credentials
-- [ ] Valid live `STRIPE_KEY` and webhook signing secret
+- [ ] Fresh `DJANGO_SECRET` (Lespass) et `SECRET_KEY` (Fedow) —
+  ne jamais réutiliser les valeurs de dev
+- [ ] Même `FERNET_KEY` dans Fedow et Lespass
+- [ ] `POSTGRES_PASSWORD` fort
+- [ ] `DOMAIN`, `FEDOW_DOMAIN`, `SUB`, `META` réels
+- [ ] Credentials SMTP valides
+- [ ] `STRIPE_KEY` live et webhook signing secret valides
 

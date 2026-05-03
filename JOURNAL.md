@@ -613,3 +613,29 @@ Testons la com
 
 On a une erreur 400. Mais donc la connexion réseau fonctionne.
 
+
+
+
+**Phase 9** - Compose unique pour Coolify
+
+Je fusionne les deux docker compose.
+
+Enlever les déclaration de réseau. Supprimer le réseau externe
+`docker network rm tibillet_backend `
+
+Ajouter les volumes : `lespass_db` et `fedow_db`. Les utiliser.
+Supprimer le volume `fedow_static`.
+
+Supprimer les deux ports 80.
+
+On garde les deux fichier .env séparé.
+
+Ca ne marche pas du premier coup, car la bdd n'est pas prete pour
+la connexion lorsque lespass veux se connecter.
+
+En relancant, c'est ok.
+
+Il n'y a plus de port exposé, donc on test de l'intérieur
+`docker exec deploy-lespass_django-1 curl http://lespass_nginx/`
+
+On récupère un 404, donc ca tourne.

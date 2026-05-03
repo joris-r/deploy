@@ -1,40 +1,59 @@
 services:
+  fedow_memcached:
+    image: memcached:1.6
+
+  fedow_django:
+    build:                          # car le context de ce Dockerfile doit être la racine du dépot
+      context: .
+      dockerfile: fedow/Dockerfile    
+    env_file: ./fedow/.env                    # relatif à ce fichier
+    volumes:
+      - fedow_db:/home/fedow/Fedow/database
+    links:
+      - fedow_memcached:memcached
+    command: ["bash", "start_prod.sh"]
+
+  fedow_nginx:
+    image: nginx:1.30
+    depends_on:
+      - fedow_django
+    volumes:
+      - ./fedow/nginx:/etc/nginx/conf.d    # volume BIND 
+      
   lespass_postgres:
     image: postgres:13-bookworm
-    env_file: .env
+    env_file: ./lespass/.env
+    volumes:
+      - lespass_db:/var/lib/postgresql/data
 
   lespass_django:
     build:              # car le context de ce Dockerfile doit être la racine du dépot
-      context: ..
+      context: .
       dockerfile: lespass/Dockerfile
     depends_on:
       - lespass_postgres
       - lespass_memcached
-    env_file: .env
+    env_file: ./lespass/.env
     environment:
       - POSTGRES_HOST=lespass_postgres
     links:
       - lespass_memcached:memcached
     volumes:
-      - ./www:/DjangoFiles/www
+      - ./lespass/www:/DjangoFiles/www
     command: ["bash", "start_prod.sh"]
-    networks:
-      - default
-      - tibillet_backend
-
 
   lespass_redis:
     image: redis:7.2-bookworm
 
   lespass_celery:
     build:              # on utilise également l'image de Lespass
-      context: ..
+      context: .
       dockerfile: lespass/Dockerfile
     depends_on:
       - lespass_postgres
       - lespass_redis
       - lespass_memcached
-    env_file: .env
+    env_file: ./lespass/.env
     environment:
       - POSTGRES_HOST=lespass_postgres
       - CELERY_BROKER=redis://lespass_redis:6379/0
@@ -49,13 +68,10 @@ services:
     image: nginx:1.30
     depends_on:
       - lespass_django
-#    ports:
-#      - 80:80
     volumes:
-      - ./nginx:/etc/nginx/conf.d    # volume BIND 
-      - ./www:/www                   # on utilise un répertoire du host pour partager les fichiers statiques
+      - ./lespass/nginx:/etc/nginx/conf.d    # volume BIND 
+      - ./lespass/www:/www                   # on utilise un répertoire du host pour partager les fichiers statiques
 
-networks:
-  default:
-  tibillet_backend:
-    external: true
+volumes:
+  fedow_db:
+  lespass_db:
