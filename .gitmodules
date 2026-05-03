@@ -1,0 +1,6 @@
+[submodule "repo/Fedow"]
+	path = repo/Fedow
+	url = https://github.com/TiBillet/Fedow.git
+[submodule "repo/Lespass"]
+	path = repo/Lespass
+	url = https://github.com/TiBillet/Lespass.git
