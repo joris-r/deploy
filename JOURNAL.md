@@ -497,3 +497,64 @@ Pour Redis, il suffit d'utiliser l'image officielle.
 Pour Celery, c'est un package python qui est présent dans l'image de lespass.
 Donc on réutilise l'image, mais on a une commande spécifique.
 
+
+**Phase 7** - Add Memcached and Nginx to Lespass
+
+Pour chercher dans les fichier
+
+grep -rn "MEMCACHE" repo/Lespass/ --include="*.py"
+
+
+Dans un fichier
+
+grep -n "CACHE\|memcach" repo/Lespass/TiBillet/settings.py
+
+
+Dans docker compose, pour un service
+`links: <A>:<B>` permet de créer un alias réseau `<B>`
+
+
+Ajouter memcached, c'est facile mais il faut utiliser un `link` car
+l'image lespass suppose qu'il est accessible au hostname `memcached`.
+Il faut aussi ajouter des `depend_on`.
+
+
+Pour nginx (Engine X), une image du hub.
+On enleve l'exposition du port de django (plus utile).
+Ajouter une volume nommé pour les fichiers statiques.
+Pas oublier le depend_on vers django. 
+
+`docker compose -f lespass/docker-compose.yml up -d`
+
+Il y a un problème de permission sur `/DjangoFiles/www` car
+le volume qu'on vient d'ajouter à les droit root.
+La solution est de créer en avance les chemins dans le script
+de lancement pour que les répertoires existent avec le bon propriétaire.
+Ca ne peut pas être dans le Dockerfile car les volumes sont appliquées
+par dessus les images.
+==> mais cela n'a pas fonctionné, donc on a utilisé un bind mount
+avec un répertoire sur le host. Il y a aussi eu un problème car
+docker a tout créé en root, mais sur le host on peut corriger à
+la main le proprio.
+
+`docker compose -f lespass/docker-compose.yml logs lespass_django`
+
+Pour voir des logs
+`docker compose -f lespass/docker-compose.yml logs lespass_django`
+
+
+Pour relancer avec un rebuild
+`docker compose -f lespass/docker-compose.yml up --build`
+
+
+On vérifie que ca marche avec `curl http://localhost/`
+Et regarder les logs.
+docker compose -f lespass/docker-compose.yml logs lespass_django --since=2m
+
+Ca ne marchait toujours pas car docker avait créé les fichiers avec root.
+J'ai chown sur mon host.
+
+Avec `curl -v http://localhost/`. On a une erreur 404, donc c'est bon.
+
+Note : gestion des volumes par Docker, c'est en root. Ce n'est pas satisfaisant.
+

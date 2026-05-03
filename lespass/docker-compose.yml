@@ -9,11 +9,14 @@ services:
       dockerfile: lespass/Dockerfile
     depends_on:
       - lespass_postgres
+      - lespass_memcached
     env_file: .env
     environment:
       - POSTGRES_HOST=lespass_postgres
-    ports:
-      - "8002:8002"
+    links:
+      - lespass_memcached:memcached
+    volumes:
+      - ./www:/DjangoFiles/www
     command: ["bash", "start_prod.sh"]
 
 
@@ -24,11 +27,27 @@ services:
     build:              # on utilise également l'image de Lespass
       context: ..
       dockerfile: lespass/Dockerfile
+    depends_on:
+      - lespass_postgres
+      - lespass_redis
+      - lespass_memcached
     env_file: .env
     environment:
       - POSTGRES_HOST=lespass_postgres
       - CELERY_BROKER=redis://lespass_redis:6379/0
-    depends_on:
-      - lespass_postgres
-      - lespass_redis
+    links:
+      - lespass_memcached:memcached
     command: "poetry run celery -A TiBillet worker -l INFO -B --concurrency=6"
+
+  lespass_memcached:
+    image: memcached:1.6
+
+  lespass_nginx:
+    image: nginx:1.30
+    depends_on:
+      - lespass_django
+    ports:
+      - 80:80
+    volumes:
+      - ./nginx:/etc/nginx/conf.d    # volume BIND 
+      - ./www:/www                   # on utilise un répertoire du host pour partager les fichiers statiques

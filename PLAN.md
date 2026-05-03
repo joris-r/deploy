@@ -258,6 +258,26 @@ over HTTPS, with TLS managed by Coolify.
 
 ------------------------------------------------------------------------
 
+### Cleanup --- Supprimer le volume `fedow_static` inutile
+
+Le volume nommé `fedow_static` a été ajouté dans le compose Fedow
+par anticipation, mais Fedow ne fait pas de `collectstatic` — il
+n'écrit jamais dans ce volume. Nginx sert un dossier `/www` vide.
+
+**Steps:**
+
+1.  Retirer `fedow_static` du service `fedow_django` (section
+    `volumes:`)
+2.  Retirer `fedow_static` du service `fedow_nginx` (section
+    `volumes:`)
+3.  Retirer `fedow_static` de la section `volumes:` globale
+4.  `docker compose -f fedow/docker-compose.yml up`
+
+**Verify:** Fedow fonctionne toujours, `curl http://localhost/`
+répond.
+
+------------------------------------------------------------------------
+
 ## 9. Deploying on Coolify
 
 ### Pre-conditions on the host
