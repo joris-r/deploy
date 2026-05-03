@@ -118,3 +118,34 @@ tout opérateur habitué à la convention Django et casse l'intégration
 avec des outils qui injectent `SECRET_KEY` automatiquement.
 
 **Action :** renommer en `SECRET_KEY` dans `settings.py`.
+
+## Fedow + Lespass — variables d'environnement non préfixées
+
+Fedow et Lespass partagent des noms de variables identiques mais avec
+des valeurs différentes : `DOMAIN`, `SECRET_KEY`, `DEBUG`, `TEST`,
+`STRIPE_KEY`, `STRIPE_KEY_TEST`, `STRIPE_TEST`. Cela rend impossible
+un déploiement avec un environnement partagé (Coolify, `.env` unique)
+sans remapping manuel.
+
+Workaround actuel dans ce dépot `deploy` : `fedow/start_prod.sh`
+relit les variables préfixées `FEDOW_*` et les exporte sous les noms
+attendus par Django.
+
+**Action :** préfixer toutes les variables spécifiques à Fedow avec
+`FEDOW_` dans `fedowallet_django/settings.py` et mettre à jour
+`env_example`.
+
+## Fedow + Lespass — pas d'image Docker Hub utilisable
+
+Les `dockerfile` officiels font `COPY ./ /DjangoFiles` en supposant
+que le code source est présent localement au moment du build. Il
+n'existe pas d'image publiée sur Docker Hub permettant un déploiement
+sans le code source (contrairement à ce que laisse supposer
+`tibillet/fedow:latest` commenté dans les composes).
+
+Cela force à avoir le code source disponible au build, ce qui
+complique les déploiements via des outils comme Coolify — et nécessite
+l'usage de git submodules dans le dépot de déploiement.
+
+**Action :** publier des images officielles sur Docker Hub et
+documenter le workflow de build/push.

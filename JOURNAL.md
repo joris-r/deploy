@@ -639,3 +639,93 @@ Il n'y a plus de port exposé, donc on test de l'intérieur
 `docker exec deploy-lespass_django-1 curl http://lespass_nginx/`
 
 On récupère un 404, donc ca tourne.
+
+
+**Phase 10** - Deploy on Coolify
+
+On a du ajouter les deux dépot git en submodule pour que Coolify
+les clone aussi.
+
+Les variables d'env qui ont le même nom sont un problème pur coolify
+car il ne sert pas du tout des fichier d'env. Qui ne sont pas dans le
+git de toute façon...
+Donc on a ajoutré dans fedow/start_prod.sh des 
+export DOMAIN=$FEDOW_DOMAIN pour dédupliquer les variables.
+
+Ainsi j'ai pu saisir les variable dans l'interface de Coolify.
+
+Enuite, on a eu le même problème qu'en local avec le répertoire BIND
+pour les fichier statiques qui étaient en root.
+Normalement Coolify supprime le répertoire de build mais il garde
+quand même les répertoires bindé. J'ai donc pu corriger le propriétaire.
+
+Enuite, les fichiers de conf de nginx était absent de ses répertoires.
+Rajouté à la main (mais ca ne survirera pas à un redeploy)
+
+
+cat > /data/coolify/applications/ghlvam6iuanigrg1zl9ilrlz/lespass/nginx/django.conf << 'EOF'
+server {
+
+    listen 80;
+    server_name localhost;
+
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+
+    location /static {
+        root /www;
+    }
+
+    location /media {
+        root /www;
+    }
+
+    location / {
+        # everything is passed to Gunicorn
+        proxy_pass http://lespass_django:8002;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_redirect off;
+    }
+}
+EOF
+
+cat > /data/coolify/applications/ghlvam6iuanigrg1zl9ilrlz/fedow/nginx/django.conf << 'EOF'
+server {
+
+    listen 80;
+    server_name localhost;
+
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+
+    location /static {
+        root /www;
+    }
+
+    location /media {
+        root /www;
+    }
+
+    location / {
+        # everything is passed to Gunicorn
+        proxy_pass http://fedow_django:8000;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host $host;
+        proxy_redirect off;
+    }
+}
+EOF
+
+Il y a un problème pour avoir les certificats Let's Encrypt.
+Traefik ne peut pas résoudre acme-v02.api.letsencrypt.org
+depuis ses containers — problème DNS interne Docker.
+
+Certificat autosigné Traefik utilisé pour l'instant.
+les services répondent en HTTPS avec -k
+
+Résultat : Lespass et Fedow tournent sur
+https://lespass.tibillet.intra.lafab.org et https://fedow.tibillet.intra.lafab.org.
+
