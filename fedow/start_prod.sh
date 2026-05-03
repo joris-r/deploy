@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Pour Coolify, on a besoin de nettoyer le nommage des variables d'env
+export DOMAIN=$FEDOW_DOMAIN
+export SECRET_KEY=$FEDOW_SECRET_KEY
+export STRIPE_KEY=$FEDOW_STRIPE_KEY
+export STRIPE_KEY_TEST=$FEDOW_STRIPE_KEY_TEST
+export STRIPE_TEST=$FEDOW_STRIPE_TEST
+export DEBUG=$FEDOW_DEBUG
+export TEST=$FEDOW_TEST
+
 poetry run python3 manage.py migrate
 poetry run python3 manage.py install
 poetry run python3 manage.py collectstatic --noinput
