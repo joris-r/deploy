@@ -61,6 +61,18 @@
   Active aussi le cache local (LocMemCache) à la place de Memcached.
 - `STRIPE_ENDPOINT_SECRET_TEST` — webhook Stripe de test
 
+## Couplage avec Lespass
+
+Fedow et Lespass forment une **installation couplée** — ils ne peuvent
+pas être déployés indépendamment :
+
+- La `FERNET_KEY` est générée côté Fedow (`manage.py generate_fernet`)
+  puis copiée dans le `.env` de Lespass. Elle sert à chiffrer les
+  clés API échangées entre les deux services et stockées en base.
+- Lespass doit connaître `FEDOW_DOMAIN` pour joindre Fedow.
+- Les deux services doivent être up et partager la même clé pour que
+  l'intégration fonctionne.
+
 ## Notes
 
 - Memcached est attendu au hostname `memcached` (alias défini par

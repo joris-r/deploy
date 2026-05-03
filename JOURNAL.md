@@ -390,3 +390,83 @@ Mais c'est normal puisque le listing des dossiers est interdit.
 Cherchons un truc `docker exec fedow-fedow_django-1 ls /home/fedow/Fedow/www/static/`
 On le récupère avec `curl -v http://localhost/static/css/main.css`
 En fait il est vide mais peut importe (on peut le voir en ajoutant `-v`)
+
+
+## 2026-05-02 Samedi midi.
+
+J'ai une interrogation sur les bonnes pratiques pour les mise à jour
+suite à des failles critiques dans des bibliotheques de base.
+Toutes les images contiennent des version différentes des bibliotheques.
+Potentiellement, il faut tout mettre à jour régulièrement.
+
+
+Pour mettre les images
+
+- les images directement utilisées dans le le docker-compose.yml
+  - c'est màj par `docker compose pull`
+- les images de base des Dockerfiles
+  - c'est màj par `docker compose build --pull`
+
+
+Si on utilise un docker-compose, il suffit de faire ça pour màj tout
+
+``` sh
+docker compose pull && docker compose build --pull && docker compose up -d
+```
+
+
+Dans mon cas précis en ce moment c'est 
+
+``` sh
+docker compose -f fedow/docker-compose.yml pull && \
+  docker compose -f fedow/docker-compose.yml build --pull && \
+  docker compose -f fedow/docker-compose.yml up -d
+```
+
+Et il faudra le faire régulièrement
+
+
+
+
+## 2026-05-03 Dimanche 
+
+**Phase 4**
+
+Je récupère la branche V2 du dépot git officiel
+
+``` sh
+cd repo/
+git clone https://github.com/TiBillet/Lespass.git
+```
+
+J'ai écrit un `Dockerfile` pour Lespass.
+Même principe que Fedow.
+
+J'ai utilisé une variable docker pour le chemin spécifique à ce travail.
+C'est `ARG LESPASS_SRC=./repo/Lespass` à l'utilisation `${LESPASS_SRC}`
+
+On a été obligé de faire `RUN mkdir -p logs` à cause des setting de Django
+qui écrivent dans ce répertoire les logs. Django a sa propre config de
+logging dans settings.py qui écrit dans ce dossier, indépendamment des
+logs de Gunicorn (qui était configuré en arg CLI).
+
+Pour trouver le répertoire principale d'un app Django peut avoir des noms
+divers, ici c'est `TiBillet`. Il contient un `settings.py` et les conf pour
+les serveur http `wsgi.py`.
+
+On a écrit `lespass/start_prod.sh` avec beaucoup moins de choses que
+dans l'original.
+
+Pour construire l'image docker (sans docker compose)
+``` sh
+docker build -f lespass/Dockerfile -t lespass-test .
+```
+
+Ensuite on découvre ce qu'il manque (les variables d'ENV en particulier)
+en essayant le check de Django
+
+``` sh
+docker run --rm -e DOMAIN=test.local -e SUB=test -e META=test -e DJANGO_SECRET=changeme-50-chars-xxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxx lespass-test poetry run python manage.py check
+
+```

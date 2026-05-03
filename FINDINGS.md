@@ -67,6 +67,15 @@ non testée et casser la configuration.
 
 **Action :** épingler une version explicite, ex. `image: nginx:1.30`.
 
+## Lespass — `exec` manquant devant Gunicorn
+
+Même problème que Fedow : le `start.sh` du repo Lespass lance
+Gunicorn sans `exec`, bash reste PID 1 et les signaux Docker ne
+sont pas transmis correctement.
+
+**Action :** ajouter `exec` devant la commande Gunicorn dans
+`start.sh`.
+
 ## Fedow — logs dans des fichiers (Gunicorn et Nginx)
 
 Le `start.sh` passe `--log-file` à Gunicorn, et la config Nginx
@@ -83,3 +92,29 @@ et nécessitent un `logrotate` manuel.
 
 Les logs stdout sont gérés automatiquement par Docker avec rotation
 configurable (`max-size`, `max-file`).
+
+## Lespass — config Django logging écrit dans des fichiers
+
+Le handler `logfile` dans `settings.py` écrit dans
+`/DjangoFiles/logs/Djangologfile` via un `RotatingFileHandler`.
+Il est utilisé par le logger `import_export`, ce qui force Django à
+créer ce fichier au démarrage — même si le logger `root` n'utilise
+que `console`.
+
+En Docker, la convention est de logger sur stdout/stderr. Des fichiers
+de log dans le container grossissent indéfiniment et ne sont pas
+visibles via `docker logs`.
+
+**Action :** supprimer le handler `logfile` et `weasyprint` de
+`settings.py` et faire pointer tous les loggers vers `console`
+uniquement.
+
+## Lespass — variable d'environnement `SECRET_KEY` mal nommée
+
+Django utilise conventionnellement `SECRET_KEY` comme nom de variable
+d'environnement. Lespass la lit sous le nom `DJANGO_SECRET`
+(`settings.py` : `os.environ.get('DJANGO_SECRET')`), ce qui surprend
+tout opérateur habitué à la convention Django et casse l'intégration
+avec des outils qui injectent `SECRET_KEY` automatiquement.
+
+**Action :** renommer en `SECRET_KEY` dans `settings.py`.

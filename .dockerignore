@@ -1,5 +1,7 @@
 .git
-repo/Fedow/.git
-repo/Fedow/.idea
-repo/Fedow/__pycache__
-repo/Fedow/.env
+repo/*/.git
+repo/*/.idea
+repo/*/__pycache__
+repo/*/.env
+repo/*/www/
+repo/*/logs/
