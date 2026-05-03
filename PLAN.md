@@ -105,7 +105,7 @@ Nginx, not Gunicorn.
 
 ------------------------------------------------------------------------
 
-### Phase 4 --- Lespass Dockerfile
+### Phase 4 --- Lespass Dockerfile [TERMINÉE]
 
 **Why now:** Lespass depends on Fedow being reachable. But the image
 itself can be built and tested in isolation before wiring them together.
@@ -123,7 +123,7 @@ itself can be built and tested in isolation before wiring them together.
 
 ------------------------------------------------------------------------
 
-### Phase 5 --- Lespass minimal compose (Django + Postgres only)
+### Phase 5 --- Lespass minimal compose (Django + Postgres only) [TERMINÉE]
 
 **Goal:** get `manage.py migrate_schemas` to run and Django to start,
 with no Nginx, no Celery, no Redis.
@@ -157,7 +157,7 @@ services:
 
 ------------------------------------------------------------------------
 
-### Phase 6 --- Add Redis and Celery to Lespass
+### Phase 6 --- Add Redis and Celery to Lespass [TERMINÉE]
 
 **Goal:** async tasks work.
 
@@ -175,7 +175,7 @@ services:
 
 ------------------------------------------------------------------------
 
-### Phase 7 --- Add Memcached and Nginx to Lespass
+### Phase 7 --- Add Memcached and Nginx to Lespass [TERMINÉE]
 
 **Steps:**
 
@@ -188,7 +188,7 @@ services:
 
 ------------------------------------------------------------------------
 
-### Phase 8 --- Wire Lespass and Fedow together
+### Phase 8 --- Wire Lespass and Fedow together [TERMINÉE]
 
 **Goal:** Lespass can call Fedow's API using `FEDOW_DOMAIN`.
 

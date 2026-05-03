@@ -10,6 +10,9 @@ services:
     command: ["bash", "start_prod.sh"]
     volumes:
       - fedow_static:/home/fedow/Fedow/www
+    networks:
+      - default
+      - tibillet_backend
 
   fedow_nginx:
     image: nginx:1.30
@@ -21,4 +24,8 @@ services:
 volumes:
   fedow_static:
 
+networks:
+  default:
+  tibillet_backend:
+    external: true
 

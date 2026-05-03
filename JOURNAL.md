@@ -558,3 +558,58 @@ Avec `curl -v http://localhost/`. On a une erreur 404, donc c'est bon.
 
 Note : gestion des volumes par Docker, c'est en root. Ce n'est pas satisfaisant.
 
+
+
+**Phase 8** - Wire Lespass and Fedow together
+
+On a maintenant des docker compose pour Lespass et Fedow.
+Ils sont sur les deux réseau par défaut et ne peuvent donc
+pas de joindre directement.
+
+On se propose l'approche de faire un réseau "externe"
+c'est à dire pas géré par docker compose up/down.
+Comme les réseaux internes, il n'est pas accessible par
+l'hote (sauf via ports exposés).
+Mais on peut l'utiliser dans chaque docker compose.
+`docker network create tibillet_backend`
+
+Dans chaque docker compose
+``` yaml
+networks:
+  tibillet_backend:
+    external: true
+```
+
+Puis pour un service
+``` yaml
+services:
+  lespass_django:
+    networks:
+      - tibillet_backend
+```
+
+Il y a un problème pour lancer les deux ensemble : conflit
+sur le port 80. J'ai enlevé temporairement celui de lespass.
+
+``` sh
+docker compose -f lespass/docker-compose.yml up -d
+docker compose -f fedow/docker-compose.yml up -d
+docker network inspect tibillet_backend |grep Name
+```
+
+On voit
+``` json
+        "Name": "tibillet_backend",
+                "Name": "lespass-lespass_django-1",
+                "Name": "fedow-fedow_django-1",
+```
+
+Un autre problème : le réseau par défaut (nommé `default`) n'est plus appliqué
+sur les services. On peut le déclarer dans le networks global pour retrouver cela.
+De plus pour les services avec une clause networks, il faut l'ajouter aussi.
+
+Testons la com
+`docker exec -it lespass-lespass_django-1 curl http://fedow-fedow_django-1:8000/`
+
+On a une erreur 400. Mais donc la connexion réseau fonctionne.
+

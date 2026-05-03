@@ -18,6 +18,9 @@ services:
     volumes:
       - ./www:/DjangoFiles/www
     command: ["bash", "start_prod.sh"]
+    networks:
+      - default
+      - tibillet_backend
 
 
   lespass_redis:
@@ -46,8 +49,13 @@ services:
     image: nginx:1.30
     depends_on:
       - lespass_django
-    ports:
-      - 80:80
+#    ports:
+#      - 80:80
     volumes:
       - ./nginx:/etc/nginx/conf.d    # volume BIND 
       - ./www:/www                   # on utilise un répertoire du host pour partager les fichiers statiques
+
+networks:
+  default:
+  tibillet_backend:
+    external: true
