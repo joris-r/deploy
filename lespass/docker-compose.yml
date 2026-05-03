@@ -17,3 +17,18 @@ services:
     command: ["bash", "start_prod.sh"]
 
 
+  lespass_redis:
+    image: redis:7.2-bookworm
+
+  lespass_celery:
+    build:              # on utilise également l'image de Lespass
+      context: ..
+      dockerfile: lespass/Dockerfile
+    env_file: .env
+    environment:
+      - POSTGRES_HOST=lespass_postgres
+      - CELERY_BROKER=redis://lespass_redis:6379/0
+    depends_on:
+      - lespass_postgres
+      - lespass_redis
+    command: "poetry run celery -A TiBillet worker -l INFO -B --concurrency=6"

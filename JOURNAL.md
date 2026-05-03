@@ -488,5 +488,12 @@ Les variables dans `environment:` écrasent celle du fichier.
 test avec `curl -v http://localhost:8002/`
 
 
-**Phase 6**
+**Phase 6** Add Redis and Celery to Lespass
+
+TODO : il manque des `restart: unless-stopped`, par défaut c'est `no`.
+
+Pour Redis, il suffit d'utiliser l'image officielle.
+
+Pour Celery, c'est un package python qui est présent dans l'image de lespass.
+Donc on réutilise l'image, mais on a une commande spécifique.
 
