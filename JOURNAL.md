@@ -1004,3 +1004,83 @@ pour `site.intra.lafab.org` a été émis automatiquement.
   sans DNS-01, et o2switch (cPanel) n'a pas d'API ACME
   compatible — chaque service TiBillet aura son propre
   sous-domaine avec un cert individuel via HTTP-01
+
+
+## 2026-05-04 Premier déploiement fonctionnel sur Coolify
+
+### Préparation du compose
+
+Avant de redéployer, plusieurs corrections au
+`docker-compose.yml` :
+
+- `env_file:` conservé + `environment:` avec valeurs vides
+  ajouté pour que Coolify détecte et pré-remplisse les
+  variables dans son interface (issue §10)
+- `manage.py install` ajouté dans `lespass/start_prod.sh`
+  avec `|| echo WARNING` pour ne pas bloquer gunicorn
+- Healthcheck `pg_isready` sur `lespass_postgres` et
+  `condition: service_healthy` dans les `depends_on`
+  (issue §11)
+- `SUB=lafabrique` — le tenant de La Fabrique s'appelle
+  `lafabrique`, accessible sur `lafabrique.intra.lafab.org`
+- Variables Stripe ajoutées pour Lespass et Fedow (préfixe
+  `FEDOW_*` pour Fedow via `start_prod.sh`)
+- `CELERY_BROKER` et `CELERY_BACKEND` ajoutés à
+  `lespass_django` et `lespass_celery`
+- `FERNET_KEY` partagé entre Fedow et Lespass (non préfixé)
+
+### Problèmes rencontrés au déploiement
+
+**Stripe obligatoire pour `manage.py install`**
+
+`install.py` lève une exception si aucune clé Stripe
+n'est présente et que `DEBUG=False`. Les credentials
+sont à remplacer par ceux de La Fabrique avant prod.
+
+**`manage.py install` partiel : FIRST_SUB non créé**
+
+Au premier run réussi (après ajout des clés Stripe),
+`install` a créé PUBLIC, META et federation_fed mais
+pas le tenant FIRST_SUB. Raison : `Domain.objects.create()`
+(pas `get_or_create`) échoue si le domain existe déjà
+d'un run partiel précédent. Les runs suivants retournent
+trop tôt (`return` ligne 41 si PUBLIC existe).
+
+Solution : créer le tenant manuellement via Django shell :
+
+```python
+from Customers.models import Client, Domain
+tenant, _ = Client.objects.get_or_create(
+    schema_name='lafabrique',
+    defaults={'name': 'lafabrique', 'on_trial': False,
+              'categorie': Client.SALLE_SPECTACLE})
+Domain.objects.get_or_create(
+    domain='lafabrique.intra.lafab.org',
+    defaults={'tenant': tenant, 'is_primary': True})
+```
+
+**Fedow handshake et admin manquants**
+
+Puisque FIRST_SUB a été créé manuellement (bypass
+d'install), deux étapes ont dû être rejouées via shell :
+
+1. `rootConfig.root_fedow_handshake(fedow_domain)` dans
+   le contexte du tenant `public` — crée la clé API
+   chiffrée (`fedow_create_place_apikey`) dans
+   `RootConfiguration`
+2. Création du user admin + `FedowAPI()` dans le contexte
+   du tenant `lafabrique` — crée le "lieu" dans Fedow et
+   lie le wallet
+
+**`CELERY_BACKEND` pointait vers `redis://redis:6379/0`**
+
+Le hostname `redis` n'existe pas dans notre réseau Docker.
+Il fallait `redis://lespass_redis:6379/0`. Variable
+`CELERY_BACKEND` ajoutée au compose.
+
+### Résultat
+
+- https://lafabrique.intra.lafab.org répond en HTTPS
+- Connexion par email fonctionne (Celery + Redis OK)
+- Compte admin prévu opérationnel
+- Fedow lié à Lespass, wallet créé
