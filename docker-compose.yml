@@ -8,7 +8,7 @@ services:
       dockerfile: fedow/Dockerfile
     depends_on:
       - fedow_memcached
-    env_file: ./fedow/.env                    # relatif à ce fichier
+    env_file: ./fedow/.env.test
     volumes:
       - fedow_db:/home/fedow/Fedow/database
       - fedow_static:/home/fedow/Fedow/www
@@ -25,10 +25,12 @@ services:
       - fedow_django
     volumes:
       - fedow_static:/www 
+    ports:
+      - 8000:80
       
   lespass_postgres:
     image: postgres:13-bookworm
-    env_file: ./lespass/.env
+    env_file: ./lespass/.env.test
     volumes:
       - lespass_db:/var/lib/postgresql/data
 
@@ -39,7 +41,7 @@ services:
     depends_on:
       - lespass_postgres
       - lespass_memcached
-    env_file: ./lespass/.env
+    env_file: ./lespass/.env.test
     environment:
       - POSTGRES_HOST=lespass_postgres
     links:
@@ -61,7 +63,7 @@ services:
       - lespass_postgres
       - lespass_redis
       - lespass_memcached
-    env_file: ./lespass/.env
+    env_file: ./lespass/.env.test
     environment:
       - POSTGRES_HOST=lespass_postgres
       - CELERY_BROKER=redis://lespass_redis:6379/0
@@ -79,6 +81,8 @@ services:
       - lespass_django
     volumes:
       - lespass_static:/www
+    ports:
+      - 8001:80
 
 volumes:
   fedow_db:

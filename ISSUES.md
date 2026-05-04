@@ -1,6 +1,24 @@
 # Problèmes ouverts
 
+> **Contexte architectural important :** des travaux en
+> cours visent à fusionner les différents Django de TiBillet
+> (Fedow, Lespass, etc.) en une seule application. Plusieurs
+> problèmes listés ici (communication HTTPS entre services,
+> variables dupliquées, architecture réseau de Fedow)
+> pourraient devenir obsolètes à l'issue de cette
+> refactorisation. À garder en tête avant d'investir du
+> temps sur ces sujets.
 
+
+
+
+## 12. Chemin du volume `backup` de Lespass à vérifier
+
+Dans notre `docker-compose.yml` le volume backup est monté
+sur `/DjangoFiles/Backup`. La doc officielle le monte sur
+`/Backup` (à la racine). Il est possible que notre chemin
+soit incorrect et que les sauvegardes n'écrivent pas au
+bon endroit. À vérifier dans le code de Lespass.
 
 
 ## 1. Build lent sur Coolify
@@ -83,6 +101,11 @@ et Lespass ensemble.
   les deux problèmes : sa nature (URL publique ou interne)
   conditionne à la fois la documentation des variables et
   l'architecture réseau (voir problème 5)
+- Conflit de nommage : dans Lespass `FEDOW_DOMAIN` désigne
+  le domaine de Fedow ; dans notre `start_prod.sh` Fedow
+  on a fait `export DOMAIN=$FEDOW_DOMAIN`, donc `FEDOW_`
+  préfixe le propre domaine de Fedow. Même nom de variable,
+  deux significations différentes selon le contexte.
 
 **Ressource à explorer :**
 La documentation officielle d'installation TiBillet
@@ -99,46 +122,73 @@ Fedow est actuellement exposé sur un domaine public
 (`fedow.tibillet.intra.lafab.org`). Mais on ne sait pas
 si c'est nécessaire.
 
-**Questions ouvertes :**
-- Lespass appelle-t-il Fedow via une URL publique, ou
-  pourrait-il utiliser le nom de service Docker interne
-  (`http://fedow_django:8000`) ?
+**Ce qu'on a appris en lisant le code :**
+
+La commande `manage.py install` de Lespass appelle
+`https://{FEDOW_DOMAIN}/helloworld/` dès le départ pour
+vérifier que Fedow est accessible. Cela implique que :
+
+- Fedow doit être accessible en **HTTPS** (pas en HTTP)
+- `FEDOW_DOMAIN` doit être un nom de domaine résolvable
+  depuis l'intérieur du container `lespass_django`
+- Un nom de service Docker interne (`fedow_nginx`) ne
+  suffit pas car il faudrait aussi un certificat TLS
+
+**Questions encore ouvertes :**
+- Fedow est-il appelé uniquement lors de l'installation
+  ou aussi à chaque requête ?
 - D'autres clients appellent-ils Fedow directement
-  (application mobile, service tiers) ?
-- `FEDOW_DOMAIN` dans les variables Lespass : est-ce une
-  URL publique ou un nom de service interne ? La réponse
-  conditionne toute l'architecture réseau.
-- On ne sait pas si `FEDOW_DOMAIN` est utilisé uniquement
-  au démarrage (handshake, enregistrement) ou à chaque
-  requête. Si c'est seulement au démarrage, une URL
-  interne suffit même si Fedow est exposé publiquement
-  par ailleurs.
+  (application mobile, autre service) ?
 
 **Ramifications :**
-- Si Fedow peut rester interne, il n'a pas besoin de
-  domaine public, de Nginx exposé, ni de certificat TLS
-- Cela simplifierait l'architecture et réduirait la
-  surface d'attaque
+- Fedow a besoin d'un domaine public avec TLS valide,
+  au moins pour l'initialisation
+- En local, c'est un blocage : `manage.py install`
+  échoue car Fedow n'a pas de TLS
+- Cela complique le test et le développement local
 
 
-## 6. Gestion des tenants non documentée
+## 6. Séquence de mise en service de Lespass
 
-Lespass est une application multi-tenant. On ne sait pas :
+**Ce qu'on a appris en lisant le code :**
 
-- Comment créer un tenant après le premier déploiement
-- Comment fonctionne le tenant public et à quoi il sert
-- Quelle est la séquence de mise en service complète
-  (étapes admin, création d'organisation, paramétrage
-  initial)
-- Si certaines de ces étapes dépendent de Fedow ou de
-  Stripe
+Lespass est obligatoirement multi-tenant (`django-tenants`).
+Même une installation minimale crée 4 tenants via
+`manage.py install` :
+
+- **PUBLIC** (ROOT) — sur `{DOMAIN}` et `www.{DOMAIN}`
+- **META** — agenda fédéré, sur `{META}.{DOMAIN}`
+- **FIRST_SUB** — premier lieu, sur `{SUB}.{DOMAIN}`
+- **FEDERATION_FED** — usage interne, pas d'accès HTTP
+
+Cette commande doit être lancée manuellement après le
+premier déploiement. Elle n'est pas dans `start_prod.sh`.
+
+**Blocage actuel :**
+
+`manage.py install` appelle `https://{FEDOW_DOMAIN}/helloworld/`.
+Avec `DEBUG=1`, `verify=False` est passé à requests — le
+certificat n'est pas vérifié. Mais Fedow doit quand même
+écouter en HTTPS (port 443). Notre Fedow nginx n'écoute
+que sur le port 80 — la connexion est refusée.
+
+Pour débloquer en local il faudrait que Fedow nginx écoute
+en HTTPS avec un certificat autosigné. C'est faisable mais
+complexe. Pour l'instant l'initialisation ne peut se faire
+que sur le serveur Coolify où Traefik fournit le TLS.
+
+**Questions encore ouvertes :**
+- Y a-t-il des étapes après `install` (création d'admin,
+  configuration du tenant, etc.) ?
+- Stripe est-il nécessaire pour `install` ou seulement
+  pour le paiement ?
 
 **Ramifications :**
 - On ne peut pas valider que le déploiement est
-  fonctionnellement correct, seulement que les services
-  démarrent
-- Impossible de planifier le déploiement pour La Fabrique
-  sans comprendre cette séquence
+  fonctionnellement correct en local
+- L'initialisation complète ne peut se faire que sur
+  le serveur Coolify avec TLS — ce qui rend le debug
+  difficile
 
 
 ## 7. Let's Encrypt ne fonctionne pas

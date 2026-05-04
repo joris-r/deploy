@@ -854,3 +854,108 @@ docker compose logs fedow_django --tail=30
 docker exec deploy-fedow_nginx-1 ls /www/static
 docker exec deploy-lespass_nginx-1 ls /www/static
 ```
+
+
+### Architecture multi-tenant de Lespass
+
+Lespass est obligatoirement multi-tenant, basé sur
+`django-tenants`. Chaque tenant a son propre schéma
+PostgreSQL. Il n'existe pas de mode "monotenant" — même
+une installation minimale crée plusieurs tenants.
+
+**Les 4 tenants créés par `manage.py install` :**
+
+- **PUBLIC** (ROOT) — le tenant racine, accessible sur
+  `{DOMAIN}` et `www.{DOMAIN}`. Son nom est défini par
+  la variable `PUBLIC`.
+- **META** — l'agenda fédéré, accessible sur
+  `{META}.{DOMAIN}` (ex: `agenda.tibillet.localhost`).
+- **FIRST_SUB** — le premier lieu/place, accessible sur
+  `{SUB}.{DOMAIN}` (ex: `lespass.tibillet.localhost`).
+- **FEDERATION_FED** — porte la monnaie FED, pas d'accès
+  HTTP, usage interne uniquement.
+
+La commande `install` est idempotente : elle vérifie si
+les tenants existent avant de les créer.
+
+**Fichiers clés dans le repo Lespass :**
+
+- `Administration/management/commands/install.py`
+- `Customers/models.py` — modèle Client avec les
+  catégories ROOT, META, SALLE_SPECTACLE, FED
+- `TiBillet/settings.py` — SHARED_APPS vs TENANT_APPS
+
+### Lespass requiert Fedow en HTTPS pour l'initialisation
+
+La commande `install` commence par appeler
+`https://{FEDOW_DOMAIN}/helloworld/` pour vérifier que
+Fedow est accessible. Elle échoue si :
+
+- `FEDOW_DOMAIN` ne résout pas depuis l'intérieur du
+  container (ex: `localhost` = le container lui-même,
+  pas le host)
+- Fedow n'est pas accessible en HTTPS (pas de TLS)
+
+Cela confirme que Fedow doit avoir un domaine public avec
+un certificat TLS valide pour que l'installation puisse
+se faire. En local, c'est un blocage.
+
+**Piste :** utiliser `verify=False` dans la requête (hack
+de dev) ou monter un certificat autosigné sur Fedow en
+local. Mais ce n'est pas résolu.
+
+### Variables d'environnement : conflit FEDOW_DOMAIN
+
+`FEDOW_DOMAIN` désigne deux choses différentes selon le
+contexte :
+
+- Dans **Lespass** `.env` : l'URL de Fedow à appeler
+- Dans notre **`fedow/start_prod.sh`** : on a fait
+  `export DOMAIN=$FEDOW_DOMAIN`, donc c'est le propre
+  domaine de Fedow
+
+C'est le même nom, deux significations. C'est noté dans
+le §4 de ISSUES.md.
+
+### Environnement de dev fourni par Jonas (développeur principal)
+
+Jonas a fourni un fichier `env-joris` et une procédure
+de mise en place d'un environnement de dev. Points clés :
+
+**`flush.sh` est la commande d'initialisation en dev**
+
+Ce script fait tout : drop/create de la base, migrations,
+`manage.py install`, fixtures de démo, puis lance le
+serveur de dev. Il ne fonctionne que si `DEBUG=1`.
+
+Il est plus complet que `manage.py install` seul — il
+ajoute des données de démo (`demo_data_v2`) utiles pour
+tester. Pour une mise en production, on n'en voudra pas.
+
+**`TEST=1` et `DEBUG=1` débloquent le dev local**
+
+Ces flags modifient le comportement de Lespass en dev :
+ils byppassent probablement la vérification SSL lors de
+l'appel à Fedow. C'est pour ça que `manage.py install`
+échouait dans notre `.env.test` — on avait `TEST=0`.
+
+**Le setup dev est différent de notre deploy**
+
+- Utilise le `docker-compose.yml` officiel du repo
+  Lespass (`repo/Lespass/docker-compose.yml`)
+- Nécessite un réseau externe `frontend` (`docker network
+  create frontend`)
+- Fedow et Lespass sont accessibles via des sous-domaines
+  `.localhost` (`fedow.tibillet.localhost`,
+  `lespass.tibillet.localhost`) grâce à Firefox qui
+  résout `*.localhost` vers `127.0.0.1`
+- `FEDOW_DOMAIN='fedow.tibillet.localhost'` dans le
+  `.env` de Lespass
+
+**Stripe test et email**
+
+Jonas a fourni des credentials Stripe test et SMTP
+valides pour le dev. Ces credentials sont dans `env-joris`
+qui n'est pas commité.
+
+
