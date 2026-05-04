@@ -729,3 +729,128 @@ les services répondent en HTTPS avec -k
 Résultat : Lespass et Fedow tournent sur
 https://lespass.tibillet.intra.lafab.org et https://fedow.tibillet.intra.lafab.org.
 
+## 2026-05-04 - Travail sur les volumes de TiBillet
+
+### Répertoires prévus par les dépôts TiBillet
+
+Les deux dépôts prévoient des répertoires spécifiques
+pour les données persistantes, signalés par la présence
+d'un fichier `__init__` vide qui force git à les traquer.
+
+**Fedow**
+
+- `www/` — fichiers statiques générés par `collectstatic`
+- `logs/` — logs applicatifs Django
+- `database/` — base SQLite (`db.sqlite3`)
+- `backup/` — sauvegardes manuelles (contient `dumps/`
+  et un script `save.sh`)
+
+**Lespass**
+
+- `www/` — fichiers statiques générés par `collectstatic`
+- `logs/` — logs applicatifs Django
+- `Backup/` — sauvegardes (contient un sous-dossier
+  `logs/`)
+
+Note : Lespass utilise Postgres, pas SQLite — donc pas de
+répertoire `database/`. La base de données est gérée par
+le container `lespass_postgres`.
+
+**Volumes de bases de données (gérés par les images
+officielles)**
+
+- `fedow_db` — monté dans `fedow_django` à
+  `/home/fedow/Fedow/database` (SQLite)
+- `lespass_db` — monté dans `lespass_postgres` à
+  `/var/lib/postgresql/data` (Postgres)
+
+Ces volumes sont initialisés correctement par leurs images
+respectives. Pas d'intervention nécessaire de notre côté.
+
+### Problème avec le .dockerignore
+
+Notre `.dockerignore` exclut `repo/*/www/` et
+`repo/*/logs/`. Ces répertoires ne sont donc pas copiés
+dans les images par le `COPY --chown=...`. Quand Docker
+monte un volume à ces chemins, il crée les répertoires
+lui-même — en `root:root`.
+
+Résultat : le process applicatif (qui tourne en tant que
+`tibillet` ou `fedow`) ne peut pas écrire dans ces
+répertoires.
+
+Pour `logs`, on a contourné le problème dans les
+Dockerfiles avec `RUN mkdir -p logs` (qui tourne en tant
+que l'utilisateur applicatif). Mais `www` n'a jamais eu
+ce traitement.
+
+La solution retenue : **retirer `repo/*/www/` et
+`repo/*/logs/` du `.dockerignore`**, pour que le `COPY
+--chown=tibillet:tibillet` les copie dans l'image avec la
+bonne ownership. C'est cohérent avec ce que les dépôts
+prévoient.
+
+### Résolution des problèmes de volumes (ISSUES §2 et §3)
+
+**Problème `.dockerignore`**
+
+On a découvert que `www/` et `logs/` étaient exclus du
+`.dockerignore`, ce qui empêchait leur copie dans les
+images. Docker les créait donc en `root:root` au montage,
+rendant ces répertoires inaccessibles en écriture pour les
+utilisateurs applicatifs (`fedow`, `tibillet`).
+
+Solution : retirer `repo/*/www/` et `repo/*/logs/` du
+`.dockerignore`. Ces répertoires sont copiés avec
+`--chown=fedow:fedow` et `--chown=tibillet:tibillet` et
+ont donc la bonne ownership dans les images.
+
+**Variables d'environnement Fedow**
+
+Le `.env` de Fedow n'avait pas été mis à jour avec les
+noms préfixés `FEDOW_*` introduits dans `start_prod.sh`.
+Mis à jour et `.env.example` également corrigé.
+
+**Volumes nommés**
+
+Ajout de tous les volumes nommés dans le compose :
+
+- `fedow_db` — base SQLite de Fedow
+- `fedow_static` — fichiers statiques, partagé entre
+  `fedow_django` et `fedow_nginx`
+- `fedow_logs` — logs de Fedow
+- `fedow_backup` — sauvegardes de Fedow
+- `lespass_db` — base Postgres de Lespass
+- `lespass_static` — fichiers statiques, partagé entre
+  `lespass_django` et `lespass_nginx`
+- `lespass_logs` — logs de Lespass
+- `lespass_backup` — sauvegardes de Lespass
+
+Le volume statique partagé remplace le bind mount
+`./lespass/www` qui causait des problèmes de permissions.
+
+**Confs Nginx dans les images (ISSUE §3)**
+
+Créé un `Dockerfile` dans `fedow/nginx/` et `lespass/nginx/`
+qui embarque la conf avec `COPY django.conf`. Les bind
+mounts de conf sont supprimés du compose. La conf Nginx
+survit maintenant aux redéploiements.
+
+**Commandes utiles**
+
+``` sh
+# Nettoyage complet
+docker compose down -v
+docker volume prune -a
+
+# Rebuild et relance
+docker compose down -v && docker compose up --build -d
+
+# Vérifier l'état
+docker compose ps
+docker compose logs fedow_django --tail=30
+
+# Vérifier les fichiers statiques dans Nginx
+docker exec deploy-fedow_nginx-1 ls /www/static
+docker exec deploy-lespass_nginx-1 ls /www/static
+```

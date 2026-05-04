@@ -1,6 +1,8 @@
 # Problèmes ouverts
 
 
+
+
 ## 1. Build lent sur Coolify
 
 Le serveur Coolify est peu puissant. Chaque déploiement
@@ -16,7 +18,7 @@ très lente.
   pour publier des images n'est pas en place
 
 
-## 2. Bind mounts et permissions root
+## 2. Bind mounts et permissions root [CORRIGÉ le 2026-05-04]
 
 Les bind mounts actuels créent des fichiers appartenant à
 root sur le host :
@@ -36,7 +38,7 @@ acceptable en production.
   l'intervention manuelle l'est aussi
 
 
-## 3. Conf Nginx montée par bind mount
+## 3. Conf Nginx montée par bind mount [CORRIGÉ le 2026-05-04]
 
 Les fichiers de configuration Nginx sont montés par bind
 mount :
@@ -81,6 +83,14 @@ et Lespass ensemble.
   les deux problèmes : sa nature (URL publique ou interne)
   conditionne à la fois la documentation des variables et
   l'architecture réseau (voir problème 5)
+
+**Ressource à explorer :**
+La documentation officielle d'installation TiBillet
+https://tibillet.org/fr/docs/install/docker_install/ —
+à relire avec la compréhension Docker acquise durant ce
+projet. Elle répondra peut-être aux questions sur les
+variables d'environnement, les tenants, et la séquence
+de mise en service.
 
 
 ## 5. Architecture réseau de Fedow : exposition externe
@@ -150,6 +160,31 @@ répondent en HTTPS avec un certificat autosigné.
   - https://coolify.io/docs/troubleshoot/dns-and-domains/lets-encrypt-not-working
 
 
+## 9. Logs : notre déploiement ne respecte pas l'approche upstream
+
+Les dépôts Fedow et Lespass écrivent leurs logs dans des
+fichiers (`logs/`). Notre déploiement a modifié ce
+comportement pour logger sur stdout, ce qui casse la
+convention prévue par les dépôts.
+
+**Conséquences :**
+- Le répertoire `logs/` prévu par les dépôts est inutilisé
+- Si un futur changement upstream réintroduit des logs
+  fichiers, notre deploy ne sera pas prêt
+- Tant que les logs vont sur stdout, `docker logs` et
+  Coolify fonctionnent — mais c'est une divergence avec
+  upstream
+
+**Décision actuelle :** revenir à l'approche des dépôts
+(logs dans des fichiers). Cela implique de s'assurer que
+le répertoire `logs/` est correctement initialisé dans
+les images avec la bonne ownership, et de le déclarer
+comme volume nommé dans le compose.
+
+Voir FINDINGS.md pour la note à remonter à l'équipe
+TiBillet sur le sujet.
+
+
 ## 8. Pas de document de planification pour La Fabrique
 
 Le PLAN.md couvre la construction technique générale de la
@@ -177,3 +212,68 @@ problèmes avec la stack TiBillet :
 - Des temps de build lents — le site web a un déploiement
   automatisé par git qui déclenche un build sur le serveur
   à chaque push, avec les mêmes lenteurs que TiBillet
+
+## 11. Postgres pas prêt au démarrage de Lespass
+
+`depends_on: lespass_postgres` garantit que le container
+Postgres est démarré, pas qu'il est prêt à accepter des
+connexions. Postgres prend quelques secondes à s'initialiser,
+ce qui provoque des erreurs de connexion au premier
+démarrage de `lespass_django`.
+
+La solution est d'utiliser un `healthcheck` sur
+`lespass_postgres` et une condition `service_healthy` dans
+le `depends_on` de `lespass_django` :
+
+```yaml
+lespass_postgres:
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+
+lespass_django:
+  depends_on:
+    lespass_postgres:
+      condition: service_healthy
+```
+
+
+## 10. Variables d'environnement : `env_file` incompatible avec Coolify
+
+Le `docker-compose.yml` utilise `env_file:` pour pointer
+vers des fichiers `.env` locaux :
+
+```yaml
+fedow_django:
+  env_file: ./fedow/.env
+```
+
+Ces fichiers sont dans le `.gitignore` et ne sont jamais
+commitées. Coolify ne les lit pas et ne les gère pas.
+En production les variables viennent exclusivement de
+l'interface Coolify — le `env_file:` est silencieusement
+ignoré. On a donc deux sources de vérité selon
+l'environnement.
+
+Coolify détecte automatiquement les variables déclarées
+avec `environment:` dans le compose et pré-remplit son
+interface avec leurs noms. Ce serait bien plus adapté :
+
+```yaml
+fedow_django:
+  environment:
+    - SECRET_KEY=
+    - DOMAIN=
+    - ...
+```
+
+**Ramifications :**
+- Le dev local et la prod ne fonctionnent pas de la même
+  façon, ce qui est une source d'erreurs
+- Avec `environment:`, le compose devient aussi une
+  documentation vivante des variables nécessaires
+- Lié au problème 4 (variables mal documentées) : un
+  `environment:` exhaustif dans le compose serait un
+  premier pas vers ce document de référence

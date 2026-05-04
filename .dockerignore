@@ -3,5 +3,3 @@ repo/*/.git
 repo/*/.idea
 repo/*/__pycache__
 repo/*/.env
-repo/*/www/
-repo/*/logs/

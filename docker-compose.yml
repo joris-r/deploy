@@ -5,20 +5,26 @@ services:
   fedow_django:
     build:                          # car le context de ce Dockerfile doit être la racine du dépot
       context: .
-      dockerfile: fedow/Dockerfile    
+      dockerfile: fedow/Dockerfile
+    depends_on:
+      - fedow_memcached
     env_file: ./fedow/.env                    # relatif à ce fichier
     volumes:
       - fedow_db:/home/fedow/Fedow/database
+      - fedow_static:/home/fedow/Fedow/www
+      - fedow_logs:/home/fedow/Fedow/logs
+      - fedow_backup:/home/fedow/Fedow/backup
     links:
       - fedow_memcached:memcached
     command: ["bash", "start_prod.sh"]
 
   fedow_nginx:
-    image: nginx:1.30
+    build:
+      context: fedow/nginx
     depends_on:
       - fedow_django
     volumes:
-      - ./fedow/nginx:/etc/nginx/conf.d    # volume BIND 
+      - fedow_static:/www 
       
   lespass_postgres:
     image: postgres:13-bookworm
@@ -39,7 +45,9 @@ services:
     links:
       - lespass_memcached:memcached
     volumes:
-      - ./lespass/www:/DjangoFiles/www
+      - lespass_static:/DjangoFiles/www
+      - lespass_logs:/DjangoFiles/logs
+      - lespass_backup:/DjangoFiles/Backup
     command: ["bash", "start_prod.sh"]
 
   lespass_redis:
@@ -65,13 +73,19 @@ services:
     image: memcached:1.6
 
   lespass_nginx:
-    image: nginx:1.30
+    build:
+      context: ./lespass/nginx
     depends_on:
       - lespass_django
     volumes:
-      - ./lespass/nginx:/etc/nginx/conf.d    # volume BIND 
-      - ./lespass/www:/www                   # on utilise un répertoire du host pour partager les fichiers statiques
+      - lespass_static:/www
 
 volumes:
   fedow_db:
+  fedow_static:
+  fedow_logs:
+  fedow_backup:
   lespass_db:
+  lespass_static:
+  lespass_logs:
+  lespass_backup:

@@ -149,3 +149,25 @@ l'usage de git submodules dans le dépot de déploiement.
 
 **Action :** publier des images officielles sur Docker Hub et
 documenter le workflow de build/push.
+
+## Fedow + Lespass — logs dans des fichiers vs stdout
+
+Les deux dépôts sont configurés pour écrire leurs logs
+dans des répertoires (`logs/`) : Django via un
+`RotatingFileHandler` dans `settings.py`, Gunicorn via
+`--log-file` dans `start.sh`.
+
+En Docker, la convention est de logger sur stdout/stderr
+pour que `docker logs` et les interfaces comme Coolify
+puissent collecter les logs. Docker gère alors la rotation
+automatiquement.
+
+Ces deux approches sont incompatibles. Actuellement notre
+déploiement court-circuite les logs fichiers au profit de
+stdout, ce qui casse la convention des dépôts upstream.
+
+**Action :** proposer à l'équipe TiBillet de configurer
+Django et Gunicorn pour logger sur stdout en mode
+production Docker, en suivant la convention des images
+officielles (ex. Nginx redirige ses logs vers
+`/dev/stdout` et `/dev/stderr`).
