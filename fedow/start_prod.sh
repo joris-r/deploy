@@ -4,6 +4,7 @@ set -e
 # Pour Coolify, on a besoin de nettoyer le nommage des variables d'env
 export DOMAIN=$FEDOW_DOMAIN
 export SECRET_KEY=$FEDOW_SECRET_KEY
+# FERNET_KEY est déjà dans l'env, partagé avec Lespass
 export STRIPE_KEY=$FEDOW_STRIPE_KEY
 export STRIPE_KEY_TEST=$FEDOW_STRIPE_KEY_TEST
 export STRIPE_TEST=$FEDOW_STRIPE_TEST

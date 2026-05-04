@@ -1,10 +1,9 @@
 #!/bin/bash
 set -e
 
-# TODO pour le moment je ne charge pas le fichier VERSION
-# On va migrer systématiquement
-
 poetry run python3 manage.py migrate_schemas --executor=multiprocessing
+poetry run python3 manage.py install \
+  || echo "WARNING: manage.py install a échoué — à relancer manuellement si premier déploiement"
 poetry run python3 manage.py collectstatic --noinput
 
 exec poetry run gunicorn TiBillet.wsgi \
