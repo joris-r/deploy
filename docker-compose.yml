@@ -85,6 +85,7 @@ services:
       - POSTGRES_PASSWORD=
       - POSTGRES_HOST=lespass_postgres
       - CELERY_BROKER=redis://lespass_redis:6379/0
+      - CELERY_BACKEND=redis://lespass_redis:6379/0
     links:
       - lespass_memcached:memcached
     volumes:
@@ -130,6 +131,7 @@ services:
       - POSTGRES_PASSWORD=
       - POSTGRES_HOST=lespass_postgres
       - CELERY_BROKER=redis://lespass_redis:6379/0
+      - CELERY_BACKEND=redis://lespass_redis:6379/0
     links:
       - lespass_memcached:memcached
     command: "poetry run celery -A TiBillet worker -l INFO -B --concurrency=6"
