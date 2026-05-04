@@ -180,7 +180,7 @@ que sur le serveur Coolify où Traefik fournit le TLS.
   difficile
 
 
-## 7. Let's Encrypt ne fonctionne pas
+## 7. Let's Encrypt ne fonctionne pas [CORRIGÉ le 2026-05-04]
 
 Traefik ne peut pas résoudre `acme-v02.api.letsencrypt.org`
 depuis ses containers sur le serveur Coolify. Les services

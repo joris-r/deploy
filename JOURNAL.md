@@ -959,3 +959,48 @@ valides pour le dev. Ces credentials sont dans `env-joris`
 qui n'est pas commité.
 
 
+## 2026-05-04 Issue 7. Let's Encrypt ne fonctionne pas
+
+**Diagnostic**
+
+Le container `coolify-proxy` (Traefik) ne pouvait pas résoudre
+`acme-v02.api.letsencrypt.org`. L'erreur dans les logs :
+
+```
+Unable to obtain ACME certificate for domains
+error="...lookup acme-v02.api.letsencrypt.org on
+127.0.0.11:53: server misbehaving"
+```
+
+**Cause racine**
+
+Le serveur Coolify est une machine physique derrière une
+Freebox. Le DNS configuré sur l'hôte est `192.168.1.254`
+(la Freebox agit comme proxy DNS local). Les containers
+Docker sont sur des réseaux `10.x.x.x` — la Freebox refuse
+les requêtes DNS venant de ces IPs non reconnues comme
+locales. Résultat : SERVFAIL pour tout nom externe.
+
+**Fix appliqué**
+
+Ajout de DNS publics dans `/etc/docker/daemon.json` :
+
+```json
+"dns": ["1.1.1.1", "8.8.8.8"]
+```
+
+Suivi de `sudo systemctl restart docker`. Après redémarrage,
+`nslookup` depuis le container fonctionne et le certificat
+pour `site.intra.lafab.org` a été émis automatiquement.
+
+**Leçons**
+
+- Les logs Traefik sont dans `docker logs coolify-proxy`
+- La Freebox est un proxy DNS local, pas accessible depuis
+  les réseaux Docker
+- Wildcard DNS A record `*.intra.lafab.org` : OK pour router
+  le trafic vers le serveur
+- Wildcard certificat TLS `*.intra.lafab.org` : impossible
+  sans DNS-01, et o2switch (cPanel) n'a pas d'API ACME
+  compatible — chaque service TiBillet aura son propre
+  sous-domaine avec un cert individuel via HTTP-01
