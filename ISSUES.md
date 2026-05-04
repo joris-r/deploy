@@ -252,6 +252,18 @@ problèmes avec la stack TiBillet :
   automatisé par git qui déclenche un build sur le serveur
   à chaque push, avec les mêmes lenteurs que TiBillet
 
+**Stripe :**
+Les credentials Stripe actuellement configurés provisoirement
+pour débloquer `manage.py install`. Avant la mise en
+production, il faudra créer un environnement test Stripe
+avec le compte de La Fabrique et remplacer les trois
+variables dans Coolify :
+- `STRIPE_KEY_TEST`
+- `STRIPE_ENDPOINT_SECRET_TEST`
+- `TEST_STRIPE_CONNECT_ACCOUNT`
+
+**Email** Et pareil pour l'envois d'email
+
 ## 10. Variables d'environnement : `env_file` incompatible avec Coolify
 
 Le `docker-compose.yml` utilise `env_file:` pour pointer
