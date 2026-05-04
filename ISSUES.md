@@ -10,17 +10,6 @@
 > temps sur ces sujets.
 
 
-
-
-## 12. Chemin du volume `backup` de Lespass à vérifier
-
-Dans notre `docker-compose.yml` le volume backup est monté
-sur `/DjangoFiles/Backup`. La doc officielle le monte sur
-`/Backup` (à la racine). Il est possible que notre chemin
-soit incorrect et que les sauvegardes n'écrivent pas au
-bon endroit. À vérifier dans le code de Lespass.
-
-
 ## 1. Build lent sur Coolify
 
 Le serveur Coolify est peu puissant. Chaque déploiement
@@ -263,33 +252,6 @@ problèmes avec la stack TiBillet :
   automatisé par git qui déclenche un build sur le serveur
   à chaque push, avec les mêmes lenteurs que TiBillet
 
-## 11. Postgres pas prêt au démarrage de Lespass
-
-`depends_on: lespass_postgres` garantit que le container
-Postgres est démarré, pas qu'il est prêt à accepter des
-connexions. Postgres prend quelques secondes à s'initialiser,
-ce qui provoque des erreurs de connexion au premier
-démarrage de `lespass_django`.
-
-La solution est d'utiliser un `healthcheck` sur
-`lespass_postgres` et une condition `service_healthy` dans
-le `depends_on` de `lespass_django` :
-
-```yaml
-lespass_postgres:
-  healthcheck:
-    test: ["CMD-SHELL", "pg_isready -U postgres"]
-    interval: 5s
-    timeout: 5s
-    retries: 5
-
-lespass_django:
-  depends_on:
-    lespass_postgres:
-      condition: service_healthy
-```
-
-
 ## 10. Variables d'environnement : `env_file` incompatible avec Coolify
 
 Le `docker-compose.yml` utilise `env_file:` pour pointer
@@ -327,3 +289,38 @@ fedow_django:
 - Lié au problème 4 (variables mal documentées) : un
   `environment:` exhaustif dans le compose serait un
   premier pas vers ce document de référence
+
+
+## 11. Postgres pas prêt au démarrage de Lespass
+
+`depends_on: lespass_postgres` garantit que le container
+Postgres est démarré, pas qu'il est prêt à accepter des
+connexions. Postgres prend quelques secondes à s'initialiser,
+ce qui provoque des erreurs de connexion au premier
+démarrage de `lespass_django`.
+
+La solution est d'utiliser un `healthcheck` sur
+`lespass_postgres` et une condition `service_healthy` dans
+le `depends_on` de `lespass_django` :
+
+```yaml
+lespass_postgres:
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U postgres"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+
+lespass_django:
+  depends_on:
+    lespass_postgres:
+      condition: service_healthy
+```
+
+## 12. Chemin du volume `backup` de Lespass à vérifier
+
+Dans notre `docker-compose.yml` le volume backup est monté
+sur `/DjangoFiles/Backup`. La doc officielle le monte sur
+`/Backup` (à la racine). Il est possible que notre chemin
+soit incorrect et que les sauvegardes n'écrivent pas au
+bon endroit. À vérifier dans le code de Lespass.
